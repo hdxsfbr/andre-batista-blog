@@ -54,19 +54,30 @@
         animation: ghostDrift 13s ease-in-out infinite;
       }
 
-      /* 2) Cursor + tiny jitter */
+      /* 2) Cursor + typed verb cycling */
       .name-cursor::after {
         content: "▍";
         margin-left: .18rem;
         opacity: .32;
-        animation: blink 1.2s steps(1,end) infinite;
+        animation: blink 1.25s steps(1,end) infinite;
       }
-      .name-jitter {
-        animation: nudge 6s ease-in-out infinite;
+      .typed-prefix { opacity: .82; }
+      .typed-word {
+        display: inline-block;
+        min-width: 8ch;
       }
 
-      /* 3) Matrix dust canvas */
-      .fx-canvas { opacity: .18; }
+      /* 3) Matrix dust canvas (hover only) */
+      .matrix-demo .fx-canvas {
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 320ms ease, visibility 320ms ease;
+      }
+      .matrix-demo:hover .fx-canvas,
+      .matrix-demo:focus-within .fx-canvas {
+        opacity: .22;
+        visibility: visible;
+      }
       canvas.matrix { width: 100%; height: 100%; display: block; }
 
       /* 4) Echo shadow */
@@ -105,11 +116,6 @@
         50% { transform: translateX(10%); opacity:.34; }
       }
       @keyframes blink { 50% { opacity: 0; } }
-      @keyframes nudge {
-        0%, 93%, 100% { transform: translateX(0); }
-        94% { transform: translateX(.5px); }
-        95% { transform: translateX(-.5px); }
-      }
       @keyframes echoShift {
         0%,100% { transform: translate(0,0); opacity:.08; }
         50% { transform: translate(1.2px,-.8px); opacity:.16; }
@@ -121,15 +127,15 @@
       }
 
       @media (prefers-reduced-motion: reduce) {
-        .fx-terminal, .fx-terminal::after, .name-cursor::after, .name-jitter, .echo::before, .fx-sweep::before { animation: none !important; }
+        .fx-terminal, .fx-terminal::after, .name-cursor::after, .echo::before, .fx-sweep::before { animation: none !important; }
       }
     </style>
   </head>
   <body>
     <main class="container">
       <nav><a href="../index.html">← Back to home</a></nav>
-      <h1 style="margin:.7rem 0 0;">Name animation lab (v2)</h1>
-      <p class="meta">All options animate. Subtle, dark-on-light, terminal-ish.</p>
+      <h1 style="margin:.7rem 0 0;">Name animation lab (v3)</h1>
+      <p class="meta">Updated: option 2 now types/deletes one char at a time; option 3 is 3x denser + hover-only.</p>
 
       <section class="demo-grid">
         <article class="demo">
@@ -140,16 +146,16 @@
         </article>
 
         <article class="demo">
-          <h3>Option 2 — Cursor + Micro Jitter</h3>
-          <h2 class="hero-name name-cursor name-jitter">Andre Batista</h2>
-          <p class="hero-sub">Blinking caret with occasional tiny terminal twitch.</p>
+          <h3>Option 2 — Cursor + One-Char Verb Cycle</h3>
+          <h2 class="hero-name name-cursor">Andre Batista <span class="typed-prefix">·</span> <span class="typed-word" id="typedWord">build</span></h2>
+          <p class="hero-sub">Deletes and types one character at a time: build → break → learn → repeat.</p>
         </article>
 
-        <article class="demo">
+        <article class="demo matrix-demo" tabindex="0">
           <div class="fx fx-canvas"><canvas class="matrix" id="matrix1"></canvas></div>
-          <h3>Option 3 — Matrix Dust (Sparse)</h3>
+          <h3>Option 3 — Matrix Dust (3x denser, hover only)</h3>
           <h2 class="hero-name">Andre Batista</h2>
-          <p class="hero-sub">Very sparse falling glyphs in the background.</p>
+          <p class="hero-sub">Hidden by default; appears on hover/focus only.</p>
         </article>
 
         <article class="demo">
@@ -168,10 +174,52 @@
     </main>
 
     <script>
+      // Option 2: type/delete one char at a time, not too fast
       (function () {
+        const el = document.getElementById('typedWord');
+        const words = ['build', 'break', 'learn', 'repeat'];
+        let i = 0;
+        let text = words[0];
+        let deleting = false;
+
+        function tick() {
+          const target = words[i];
+
+          if (!deleting && text.length < target.length) {
+            text = target.slice(0, text.length + 1);
+            el.textContent = text;
+            return setTimeout(tick, 130);
+          }
+
+          if (!deleting && text.length === target.length) {
+            deleting = true;
+            return setTimeout(tick, 950);
+          }
+
+          if (deleting && text.length > 0) {
+            text = text.slice(0, -1);
+            el.textContent = text;
+            return setTimeout(tick, 95);
+          }
+
+          if (deleting && text.length === 0) {
+            deleting = false;
+            i = (i + 1) % words.length;
+            return setTimeout(tick, 240);
+          }
+        }
+
+        tick();
+      })();
+
+      // Option 3: matrix dust, 3x denser, only renders while hovered/focused
+      (function () {
+        const host = document.querySelector('.matrix-demo');
         const c = document.getElementById('matrix1');
         const ctx = c.getContext('2d');
-        const chars = '01$#{}[]<>/\\+=-';
+        const chars = '01$#{}[]<>/\\+=-buildbreaklearnrepeat';
+        let active = false;
+
         function resize() {
           const r = c.getBoundingClientRect();
           c.width = Math.max(1, Math.floor(r.width * devicePixelRatio));
@@ -181,23 +229,31 @@
         resize();
         addEventListener('resize', resize);
 
-        const cols = Math.max(10, Math.floor(c.getBoundingClientRect().width / 26));
-        const drops = Array(cols).fill(0).map(() => Math.random() * -40);
+        const cols = Math.max(18, Math.floor(c.getBoundingClientRect().width / 8)); // ~3x denser vs old spacing
+        const drops = Array(cols).fill(0).map(() => Math.random() * -60);
+
+        host.addEventListener('mouseenter', () => active = true);
+        host.addEventListener('mouseleave', () => active = false);
+        host.addEventListener('focusin', () => active = true);
+        host.addEventListener('focusout', () => active = false);
 
         function draw() {
-          const w = c.getBoundingClientRect().width;
-          const h = c.getBoundingClientRect().height;
-          ctx.fillStyle = 'rgba(255,255,255,0.08)';
-          ctx.fillRect(0, 0, w, h);
-          ctx.fillStyle = 'rgba(0,0,0,0.35)';
-          ctx.font = '11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
-          for (let i = 0; i < cols; i++) {
-            const x = i * 26 + 4;
-            const y = drops[i] * 12;
-            const ch = chars[(Math.random() * chars.length) | 0];
-            if (y > -12 && y < h + 20) ctx.fillText(ch, x, y);
-            drops[i] += 0.04 + Math.random() * 0.08;
-            if (y > h + 40) drops[i] = Math.random() * -20;
+          if (active) {
+            const w = c.getBoundingClientRect().width;
+            const h = c.getBoundingClientRect().height;
+            ctx.fillStyle = 'rgba(255,255,255,0.14)';
+            ctx.fillRect(0, 0, w, h);
+            ctx.fillStyle = 'rgba(0,0,0,0.40)';
+            ctx.font = '10px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
+
+            for (let i = 0; i < cols; i++) {
+              const x = i * 8 + 2;
+              const y = drops[i] * 10;
+              const ch = chars[(Math.random() * chars.length) | 0];
+              if (y > -10 && y < h + 20) ctx.fillText(ch, x, y);
+              drops[i] += 0.07 + Math.random() * 0.12;
+              if (y > h + 30) drops[i] = Math.random() * -24;
+            }
           }
           requestAnimationFrame(draw);
         }
