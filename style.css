@@ -27,14 +27,7 @@ html, body {
   position: relative;
   overflow: hidden;
   border-radius: 10px;
-}
-
-.hero h1 {
-  position: relative;
-  z-index: 2;
-  font-size: clamp(2rem, 6vw, 3.25rem);
-  margin: 0;
-  letter-spacing: -0.02em;
+  padding: .1rem 0;
 }
 
 .hero-matrix {
@@ -45,27 +38,38 @@ html, body {
   z-index: 1;
   pointer-events: none;
   opacity: 0;
-  transition: opacity 260ms ease;
+  transition: opacity 220ms ease;
 }
 
 .hero.active .hero-matrix,
 .hero:hover .hero-matrix,
 .hero:focus-within .hero-matrix {
-  opacity: 0.22;
+  opacity: 0.28;
 }
 
 .hero-terminal {
   position: relative;
   z-index: 2;
-  margin: .28rem 0 0;
-  font: 500 .9rem/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  color: #2d2d2d;
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: #111;
+}
+
+.hero-title {
+  font-size: clamp(1.5rem, 4vw, 2.15rem);
+  line-height: 1.2;
+  font-weight: 800;
+  letter-spacing: -0.01em;
 }
 
 .caret {
-  margin-left: .08rem;
-  opacity: .55;
-  animation: caretBlink 1.25s steps(1, end) infinite;
+  display: inline-block;
+  width: .62ch;
+  height: 1.02em;
+  background: #111;
+  margin-left: .08ch;
+  vertical-align: -0.06em;
+  animation: caretBlink 1.05s steps(1, end) infinite;
 }
 
 @keyframes caretBlink {
@@ -75,7 +79,7 @@ html, body {
 .tagline {
   position: relative;
   z-index: 2;
-  margin-top: 0.6rem;
+  margin-top: 0.62rem;
   color: var(--muted);
 }
 

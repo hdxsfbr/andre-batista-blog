@@ -11,8 +11,7 @@
     <main class="container">
       <header class="hero" id="heroFx" tabindex="0">
         <canvas id="matrixDust" class="hero-matrix" aria-hidden="true"></canvas>
-        <h1>Andre Batista</h1>
-        <p class="hero-terminal" aria-live="polite">/home/andre-batista/{<span id="typedWord">build</span><span class="caret" aria-hidden="true">▍</span>}</p>
+        <p class="hero-terminal hero-title" aria-live="polite">/home/andre-batista/<span id="typedWord">build</span><span class="caret" aria-hidden="true"></span></p>
         <p class="tagline">A lab notebook for code, systems, and whatever I’m obsessing over this week.</p>
       </header>
 
@@ -48,7 +47,6 @@
     <script>
       document.getElementById('year').textContent = new Date().getFullYear();
 
-      // Typing loop: build -> break -> learn -> repeat (char-by-char)
       (function () {
         const el = document.getElementById('typedWord');
         const words = ['build', 'break', 'learn', 'repeat'];
@@ -62,31 +60,28 @@
           if (!deleting && text.length < target.length) {
             text = target.slice(0, text.length + 1);
             el.textContent = text;
-            return setTimeout(tick, 130);
+            return setTimeout(tick, 140);
           }
 
           if (!deleting && text.length === target.length) {
             deleting = true;
-            return setTimeout(tick, 1000);
+            return setTimeout(tick, 950);
           }
 
           if (deleting && text.length > 0) {
             text = text.slice(0, -1);
             el.textContent = text;
-            return setTimeout(tick, 100);
+            return setTimeout(tick, 105);
           }
 
-          if (deleting && text.length === 0) {
-            deleting = false;
-            i = (i + 1) % words.length;
-            return setTimeout(tick, 260);
-          }
+          deleting = false;
+          i = (i + 1) % words.length;
+          return setTimeout(tick, 260);
         }
 
         tick();
       })();
 
-      // Matrix dust: subtle + hover/focus only over hero
       (function () {
         const hero = document.getElementById('heroFx');
         const canvas = document.getElementById('matrixDust');
@@ -108,9 +103,9 @@
         resize();
         addEventListener('resize', resize);
 
-        const colW = 10; // denser look
-        const cols = Math.max(24, Math.floor(hero.getBoundingClientRect().width / colW));
-        const drops = Array(cols).fill(0).map(() => Math.random() * -60);
+        const colW = 6; // much denser
+        const cols = Math.max(60, Math.floor(hero.getBoundingClientRect().width / colW));
+        const drops = Array(cols).fill(0).map(() => Math.random() * -70);
 
         hero.addEventListener('mouseenter', () => { active = true; hero.classList.add('active'); });
         hero.addEventListener('mouseleave', () => { active = false; hero.classList.remove('active'); });
@@ -126,18 +121,18 @@
             return requestAnimationFrame(draw);
           }
 
-          ctx.fillStyle = 'rgba(255,255,255,0.14)';
+          ctx.fillStyle = 'rgba(255,255,255,0.12)';
           ctx.fillRect(0, 0, w, h);
-          ctx.fillStyle = 'rgba(0,0,0,0.35)';
-          ctx.font = '10px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
+          ctx.fillStyle = 'rgba(0,0,0,0.28)';
+          ctx.font = '30px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace'; // 3x larger
 
           for (let i = 0; i < cols; i++) {
-            const x = i * colW + 2;
-            const y = drops[i] * 10;
+            const x = i * colW;
+            const y = drops[i] * 16;
             const ch = chars[(Math.random() * chars.length) | 0];
-            if (y > -10 && y < h + 20) ctx.fillText(ch, x, y);
-            drops[i] += 0.07 + Math.random() * 0.12;
-            if (y > h + 30) drops[i] = Math.random() * -24;
+            if (y > -32 && y < h + 40) ctx.fillText(ch, x, y);
+            drops[i] += 0.08 + Math.random() * 0.15;
+            if (y > h + 60) drops[i] = Math.random() * -30;
           }
 
           requestAnimationFrame(draw);
