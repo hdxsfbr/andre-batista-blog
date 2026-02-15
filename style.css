@@ -1,9 +1,9 @@
 :root {
-  --bg: #000;
-  --fg: #fff;
-  --muted: #b3b3b3;
-  --line: #222;
-  --link: #fff;
+  --bg: #fff;
+  --fg: #000;
+  --muted: #555;
+  --line: #e5e5e5;
+  --link: #000;
 }
 
 * { box-sizing: border-box; }
