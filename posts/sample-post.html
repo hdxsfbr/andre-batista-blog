@@ -1,25 +1,63 @@
 <!doctype html>
-<html lang="en">
+<html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Sample Post — Andre Batista</title>
-    <meta name="description" content="Sample post template for Andre Batista blog." />
+    <title>AndreOS v0.7 — Andre Batista</title>
+    <meta name="description" content="Resumo de como estruturei uma camada multiagente para automação pessoal e de negócios." />
     <link rel="stylesheet" href="../style.css" />
   </head>
   <body>
     <main class="container post">
       <nav><a href="../index.html">← Back to home</a></nav>
       <article>
-        <h1>Sample Post: What I’m Building With AI Assistants</h1>
-        <p class="meta">Published: Feb 2026</p>
+        <h1>AndreOS v0.7: meu sistema multiagente com OpenClaw</h1>
+        <p class="meta">Publicado: Fev 2026</p>
 
         <p>
-          This is a placeholder post while I finish writing the first real entry.
+          Nos últimos meses, saí da fase “testando bots” e montei uma camada operacional multiagente para vida,
+          trabalho e automação. A ideia foi simples: agentes com papéis claros, memória durável e rotinas que rodam sem babysitting.
         </p>
 
+        <h2>Arquitetura</h2>
         <p>
-          Soon I’ll share a breakdown of the systems, workflows, and lessons from building with AI day-to-day.
+          Troquei setup improvisado por uma arquitetura multiagente em um único gateway. Cada agente tem responsabilidades
+          explícitas (ops pessoais, atendimento de negócio, automação técnica), com foco em previsibilidade e não em improviso.
+        </p>
+
+        <h2>Automação que roda sozinha</h2>
+        <ul>
+          <li>Monitoramento de voos com cron, timeout robusto e recuperação de falhas.</li>
+          <li>Pipeline de resumo de timeline (coleta → resumo → digest), com tratamento de rate limit.</li>
+          <li>Checks agendados e lembretes proativos via heartbeat/cron.</li>
+          <li>Fluxos de triagem de mensagens e organização de tarefas.</li>
+        </ul>
+
+        <h2>Camada pessoal</h2>
+        <ul>
+          <li>Nutrição por foto com estimativa conservadora e loop de correção.</li>
+          <li>Peso por foto da balança com logs append-only.</li>
+          <li>Sistema diário de execução com checklist.</li>
+          <li>Análise de xadrez com Chess.com + Stockfish (CPL, blunders, erros, imprecisões).</li>
+        </ul>
+
+        <h2>Negócio e atendimento</h2>
+        <p>
+          Também apliquei o mesmo padrão em operação de negócio local: atendimento inicial, qualificação de leads,
+          integrações com mensagens/voz e regras de comportamento para evitar “IA caótica”.
+        </p>
+
+        <h2>Lições</h2>
+        <ul>
+          <li>Contexto evapora se não for persistido.</li>
+          <li>Job longo sem timeout explícito vira bomba-relógio.</li>
+          <li>Multiagente com contrato claro > múltiplos perfis improvisados.</li>
+          <li>Confiabilidade e guardrails importam mais que respostas “criativas”.</li>
+        </ul>
+
+        <p>
+          Esse é o rascunho do <strong>AndreOS v0.7</strong>: não é chatbot solto, é uma stack operacional com papéis,
+          memória e rotina. O próximo passo é transformar isso em v1.0 com menos fricção e mais autonomia real.
         </p>
       </article>
     </main>
