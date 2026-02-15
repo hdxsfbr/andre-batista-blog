@@ -3,14 +3,45 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Andre Batista</title>
-    <meta name="description" content="Andre Batista — personal blog" />
+    <title>Andre Batista — Blog</title>
+    <meta name="description" content="Notes on building AI assistants, automation, and practical systems." />
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <main class="wrap">
-      <h1>Andre Batista</h1>
-      <p>Blog coming soon.</p>
+    <main class="container">
+      <header class="hero">
+        <h1>Andre Batista</h1>
+        <p class="tagline">Building practical AI systems, one experiment at a time.</p>
+      </header>
+
+      <section class="section" id="about">
+        <h2>About</h2>
+        <p>
+          I build lightweight tools and automations around AI assistants, messaging workflows, and personal ops.
+          This blog is where I share what worked, what broke, and what I learned.
+        </p>
+        <p>
+          <a href="#" aria-label="LinkedIn">LinkedIn</a>
+        </p>
+      </section>
+
+      <section class="section" id="posts">
+        <h2>Posts</h2>
+        <ul class="posts">
+          <li>
+            <a href="posts/sample-post.html">Sample Post: What I’m Building With AI Assistants</a>
+            <span class="meta">Feb 2026</span>
+          </li>
+        </ul>
+      </section>
+
+      <footer class="footer">
+        <p>© <span id="year"></span> Andre Batista</p>
+      </footer>
     </main>
+
+    <script>
+      document.getElementById('year').textContent = new Date().getFullYear();
+    </script>
   </body>
 </html>
