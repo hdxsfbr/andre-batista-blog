@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Name Animation Tests — Andre Batista Blog</title>
+    <link rel="stylesheet" href="../style.css" />
+    <style>
+      .demo-grid { display: grid; gap: 2rem; margin-top: 1.5rem; }
+      .demo {
+        position: relative;
+        border: 1px solid #eaeaea;
+        border-radius: 14px;
+        padding: 2.25rem 1.5rem;
+        overflow: hidden;
+        background: #fff;
+        min-height: 170px;
+      }
+      .demo h3 { margin: 0 0 .4rem; font-size: .95rem; letter-spacing: .03em; text-transform: uppercase; color: #666; }
+      .demo .hero-name {
+        position: relative;
+        z-index: 2;
+        font-size: clamp(1.8rem, 4vw, 2.5rem);
+        margin: .2rem 0;
+        letter-spacing: -0.02em;
+      }
+      .demo .hero-sub { position: relative; z-index: 2; margin: 0; color: #666; font-size: .95rem; }
+      .fx-layer { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+
+      /* 1) Phantom Terminal */
+      .fx-terminal {
+        font: 500 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        color: #000;
+        opacity: .055;
+      }
+      .fx-terminal::before,
+      .fx-terminal::after {
+        content: "$ cron run\A$ parse inbox\A$ retry rate-limit\A$ ship fix\A$ log memory\A$ deploy main";
+        white-space: pre;
+        position: absolute;
+        left: -10%;
+        top: 16%;
+        animation: driftX 24s linear infinite;
+      }
+      .fx-terminal::after {
+        content: "$ grep signal\A$ summarize timeline\A$ tests:pass\A$ push origin main\A$ monitor jobs\A$ done";
+        top: 56%;
+        animation-duration: 32s;
+        animation-direction: reverse;
+      }
+
+      /* 2) Scanline + cursor */
+      .fx-scan::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: repeating-linear-gradient(
+          to bottom,
+          rgba(0,0,0,.02) 0,
+          rgba(0,0,0,.02) 1px,
+          transparent 2px,
+          transparent 4px
+        );
+        opacity: .35;
+      }
+      .name-cursor::after {
+        content: "▍";
+        margin-left: .18rem;
+        opacity: .22;
+        animation: blink 1.6s steps(1, end) infinite;
+      }
+
+      /* 3) Sparse code rain */
+      .fx-rain {
+        overflow: hidden;
+      }
+      .fx-rain .col {
+        position: absolute;
+        top: -120%;
+        font: 500 11px/1.1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        color: #111;
+        opacity: .06;
+        animation: drop linear infinite;
+        white-space: pre;
+      }
+
+      /* 4) Bonus: glitch whisper */
+      .ghost-glitch {
+        position: absolute;
+        left: 1.5rem;
+        top: 3.2rem;
+        font-size: clamp(1.8rem, 4vw, 2.5rem);
+        letter-spacing: -0.02em;
+        color: #000;
+        opacity: .05;
+        filter: blur(.2px);
+        animation: glitchNudge 9s infinite;
+      }
+
+      @keyframes driftX { from { transform: translateX(0); } to { transform: translateX(22%); } }
+      @keyframes blink { 50% { opacity: 0; } }
+      @keyframes drop { to { transform: translateY(240%); } }
+      @keyframes glitchNudge {
+        0%, 94%, 100% { transform: translate(0,0); opacity: .045; }
+        95% { transform: translate(1px, -1px); opacity: .07; }
+        96% { transform: translate(-1px, 0); }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .fx-terminal::before,.fx-terminal::after,.name-cursor::after,.fx-rain .col,.ghost-glitch { animation: none !important; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="container">
+      <nav><a href="../index.html">← Back to home</a></nav>
+      <h1 style="margin:.7rem 0 0;">Name animation lab</h1>
+      <p class="meta">Subtle + terminal-ish tests. Pick one and I’ll apply it to the real homepage.</p>
+
+      <section class="demo-grid">
+        <article class="demo">
+          <div class="fx-layer fx-terminal"></div>
+          <h3>Option 1 — Phantom Terminal</h3>
+          <h2 class="hero-name">Andre Batista</h2>
+          <p class="hero-sub">Faint drifting terminal traces behind the name.</p>
+        </article>
+
+        <article class="demo">
+          <div class="fx-layer fx-scan"></div>
+          <h3>Option 2 — Scanline + Cursor</h3>
+          <h2 class="hero-name name-cursor">Andre Batista</h2>
+          <p class="hero-sub">Almost-static CRT texture + low-key cursor blink.</p>
+        </article>
+
+        <article class="demo">
+          <div class="fx-layer fx-rain" aria-hidden="true">
+            <span class="col" style="left:8%; animation-duration:24s; animation-delay:-6s;">01010101\ninit()\nwhile(true)\nship()</span>
+            <span class="col" style="left:31%; animation-duration:29s; animation-delay:-13s;">{build}\n{break}\n{learn}\n{repeat}</span>
+            <span class="col" style="left:54%; animation-duration:26s; animation-delay:-2s;">cron\nqueue\nretry\nok</span>
+            <span class="col" style="left:77%; animation-duration:34s; animation-delay:-17s;">git push\nmain\nprod\ndone</span>
+          </div>
+          <h3>Option 3 — Sparse Code Rain</h3>
+          <h2 class="hero-name">Andre Batista</h2>
+          <p class="hero-sub">Matrix-inspired, but super sparse and low-opacity.</p>
+        </article>
+
+        <article class="demo">
+          <div class="ghost-glitch">Andre Batista</div>
+          <h3>Bonus — Glitch Whisper</h3>
+          <h2 class="hero-name">Andre Batista</h2>
+          <p class="hero-sub">A tiny occasional ghost shift, almost imperceptible.</p>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>
