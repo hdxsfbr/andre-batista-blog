@@ -3,62 +3,231 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AndreOS v0.7 — Andre Batista</title>
-    <meta name="description" content="A summary of how I structured a multi-agent operating layer for personal and business automation." />
+    <title>The Andre OpenClaw System (AndreOS v0.7) — Andre Batista</title>
+    <meta
+      name="description"
+      content="How I built a multi-agent operating layer with OpenClaw for personal operations, business operations, and technical automation."
+    />
     <link rel="stylesheet" href="../style.css" />
   </head>
   <body>
     <main class="container post">
       <nav><a href="../index.html">← Back to home</a></nav>
       <article>
-        <h1>AndreOS v0.7: My OpenClaw Multi-Agent System</h1>
+        <h1>🧠 The Andre OpenClaw System (AndreOS v0.7)</h1>
         <p class="meta">Published: Feb 2026</p>
 
         <p>
-          Over the last phase, I moved from “playing with bots” to building a practical multi-agent operating layer
-          for life, business, and automation. The core idea was simple: explicit roles, durable memory, and routines
-          that run without constant babysitting.
+          Over the last phase, I designed, deployed, and iterated on a structured multi-agent system with OpenClaw.
+          The goal was simple: stop treating LLM agents like chat toys and start using them as durable,
+          role-based operators across three domains:
         </p>
-
-        <h2>Architecture</h2>
-        <p>
-          I replaced ad-hoc setup with a clean multi-agent model on one gateway. Each agent has clear responsibilities
-          (personal ops, business front-desk behavior, technical automation), with emphasis on predictability over improvisation.
-        </p>
-
-        <h2>Automation That Runs</h2>
         <ul>
-          <li>Flight monitoring with cron, robust timeout handling, and recovery logic.</li>
-          <li>Timeline digest pipeline (pull → summarize → digest), including rate-limit lessons.</li>
-          <li>Scheduled checks and reminders through heartbeat/cron patterns.</li>
-          <li>Message triage and task organization workflows.</li>
-        </ul>
-
-        <h2>Personal Ops Layer</h2>
-        <ul>
-          <li>Photo-based nutrition tracking with conservative macro estimates and correction loops.</li>
-          <li>Scale-photo weight tracking with append-only logs.</li>
-          <li>Daily execution system using checklist discipline.</li>
-          <li>Chess analysis with Chess.com + Stockfish (CPL, blunders, mistakes, inaccuracies).</li>
-        </ul>
-
-        <h2>Business Ops Layer</h2>
-        <p>
-          I applied the same principles to local business operations: front-desk intake behavior, lead qualification,
-          messaging/voice integration, and explicit guardrails to avoid chaotic assistant behavior.
-        </p>
-
-        <h2>What I Learned</h2>
-        <ul>
-          <li>Context evaporates unless persisted.</li>
-          <li>Long jobs without explicit timeout discipline become failure-prone.</li>
-          <li>Role-based multi-agent systems beat profile sprawl.</li>
-          <li>Reliability and behavior contracts matter more than clever outputs.</li>
+          <li>Personal operations</li>
+          <li>Business operations (Eva Home Cleaning)</li>
+          <li>Automation and technical infrastructure</li>
         </ul>
 
         <p>
-          This is my current <strong>AndreOS v0.7</strong>: not random chatbot experiments, but a structured operating stack
-          with roles, memory, and routines. Next step is shaping v1.0 with lower friction and stronger autonomy.
+          This post is the consolidated breakdown of what I built, what failed, what got hardened, and what this sets up next.
+        </p>
+
+        <h2>1) Infrastructure & Multi-Agent Architecture</h2>
+        <p>
+          I moved from ad-hoc experimentation to a clean multi-agent architecture on a single OpenClaw gateway.
+        </p>
+
+        <h3>What changed</h3>
+        <ul>
+          <li>Pivoted from a messy multi-profile setup to one structured multi-agent runtime.</li>
+          <li>Defined explicit agent identities and responsibilities:</li>
+          <ul>
+            <li><strong>Joe</strong> → personal ops + automation architect</li>
+            <li><strong>Eva</strong> → business front desk + lead qualification behavior</li>
+            <li><strong>MacJoe</strong> → systems tasks, browser automation, glue logic</li>
+          </ul>
+          <li>Tightened session-to-memory workflows to reduce context loss.</li>
+          <li>Investigated semantic retrieval and indexing behavior in the memory layer.</li>
+          <li>Improved persistence hygiene (important decisions now written to durable files).</li>
+          <li>Resolved long-run timeout fragility in automation jobs.</li>
+        </ul>
+
+        <p><strong>Outcome:</strong> agents became stateful operators, not just chat interfaces.</p>
+
+        <h2>2) Automation Engine (Things That Run Without Babysitting)</h2>
+        <p>I built a practical automation layer around repeatable jobs and proactive checks.</p>
+
+        <h3>🛫 Flight Monitoring Bot</h3>
+        <ul>
+          <li>Cron-based SFO ↔ GRU monitoring.</li>
+          <li>Global timeout controls and per-task error handling.</li>
+          <li>Progress logging and survivability for long runs.</li>
+        </ul>
+
+        <h3>📰 X/Twitter Timeline Digest</h3>
+        <ul>
+          <li>Pipeline: pull → summarize → digest.</li>
+          <li>Learned rate-limit and retry behavior in real usage.</li>
+          <li>Structured output focused on signal over noise.</li>
+        </ul>
+
+        <h3>⏰ Scheduled Operations</h3>
+        <ul>
+          <li>Cron jobs + heartbeat-style checks.</li>
+          <li>Reminder and proactive monitoring logic.</li>
+          <li>Shifted behavior from reactive to predictable.</li>
+        </ul>
+
+        <h3>📧 Recruiter Outreach Tracker</h3>
+        <ul>
+          <li>Gmail → Google Sheets automation.</li>
+          <li>Node + CLI-based integration.</li>
+          <li>Detect outreach, filter noise, extract company/role, save structured rows.</li>
+        </ul>
+
+        <p><strong>Outcome:</strong> a lightweight personal automation framework with LLMs as intelligent middleware.</p>
+
+        <h2>3) Personal Operations Layer</h2>
+        <p>I turned agents into everyday systems, not occasional helpers.</p>
+
+        <h3>🥗 Nutrition Tracking System</h3>
+        <ul>
+          <li>Photo → conservative macro estimate.</li>
+          <li>Correction-based calibration loop.</li>
+          <li>Append-only logging for durability.</li>
+        </ul>
+
+        <h3>⚖️ Weight Tracking System</h3>
+        <ul>
+          <li>Scale-photo ingestion.</li>
+          <li>Append-only logs for trend tracking.</li>
+        </ul>
+
+        <h3>📋 Daily Execution System</h3>
+        <ul>
+          <li>DAILY.md-based task flow.</li>
+          <li>Checklist discipline and execution focus.</li>
+        </ul>
+
+        <h3>♟️ Chess Analysis System</h3>
+        <ul>
+          <li>Chess.com + Stockfish integration.</li>
+          <li>CPL metrics + blunder/mistake/inaccuracy reporting.</li>
+        </ul>
+
+        <p><strong>Outcome:</strong> the beginning of a quantified-self layer powered by role-based agents.</p>
+
+        <h2>4) Voice & Messaging UX Experiments</h2>
+        <p>
+          I didn’t just build backend automations. I tested controllability and UX behavior in production-like usage.
+        </p>
+        <ul>
+          <li>WhatsApp voice-reply path with explicit triggers.</li>
+          <li>Behavior controls (“voice only when requested”).</li>
+          <li>Delivery troubleshooting and operational guardrails.</li>
+          <li>Anti-manipulation constraints and clearer behavior contracts.</li>
+        </ul>
+
+        <p><strong>Outcome:</strong> moved from free-form assistant behavior to intentional, rule-bound behavior.</p>
+
+        <h2>5) Eva Home Cleaning — AI as Front Desk</h2>
+        <p>This is where the work became operationally serious.</p>
+
+        <h3>🏗 Foundation & Brand</h3>
+        <ul>
+          <li>Defined assistant voice: warm, concise, confident, conversion-focused.</li>
+          <li>Set behavior guardrails and operating rules.</li>
+        </ul>
+
+        <h3>🌐 Website & Infra</h3>
+        <ul>
+          <li>Live site and deployment workflow via GitHub + Vercel.</li>
+          <li>Business email and telephony routing integrated.</li>
+        </ul>
+
+        <h3>📞 Voice Intake Redesign</h3>
+        <ul>
+          <li>Redesigned after real-world testing.</li>
+          <li>Handled six caller patterns (new lead, job seeker, existing client, vendor/spam, wrong number, suspicious/off-topic).</li>
+          <li>Minimal intake fields: name, callback, city, brief need.</li>
+        </ul>
+
+        <h3>📈 Marketing & Ads Iteration</h3>
+        <ul>
+          <li>Identified campaign misalignment and adjusted channel strategy.</li>
+          <li>Focused on search intent and lead quality visibility.</li>
+          <li>Tracked budget guardrails and analytics instrumentation discussions.</li>
+        </ul>
+
+        <h3>🌎 Local Presence</h3>
+        <ul>
+          <li>Set up local business presence and profiles.</li>
+          <li>Resolved browser/auth friction during setup flow.</li>
+          <li>Managed address/hours visibility decisions before final publishing.</li>
+        </ul>
+
+        <p><strong>Outcome:</strong> an AI-assisted front desk integrated with web, ads, telephony, and local channels.</p>
+
+        <h2>6) Reliability & Hardening</h2>
+        <p>
+          This phase was less about demos and more about engineering discipline.
+        </p>
+        <ul>
+          <li>Investigated gateway runtime architecture and behavior.</li>
+          <li>Diagnosed schema/config blockers in voice pathways.</li>
+          <li>Created proof-of-concept branches for processing flow improvements.</li>
+          <li>Hardened timeout handling and long-run durability patterns.</li>
+        </ul>
+
+        <p>
+          The mental model shifted toward:
+        </p>
+        <ul>
+          <li>Failure modes</li>
+          <li>Recovery strategies</li>
+          <li>Persistence guarantees</li>
+          <li>Schema alignment</li>
+        </ul>
+
+        <h2>What Was Actually Built (Zoomed Out)</h2>
+        <p>
+          In practice, this became a multi-layer personal operating stack:
+        </p>
+        <ul>
+          <li>Personal automation layer</li>
+          <li>Business operations layer</li>
+          <li>Quantified-self layer</li>
+          <li>Lead intake layer</li>
+          <li>Recruiter tracking layer</li>
+          <li>Messaging/voice experimentation layer</li>
+        </ul>
+
+        <p>
+          In short: <strong>AndreOS v0.7</strong>, powered by OpenClaw.
+        </p>
+        <p>
+          Not just chatbots. Not just scripts. A structured, role-based AI operations system.
+        </p>
+
+        <h2>Lessons Extracted</h2>
+        <ul>
+          <li>Context evaporates unless you persist it.</li>
+          <li>Long-running jobs require explicit timeout discipline.</li>
+          <li>Multi-agent architecture beats profile chaos.</li>
+          <li>Business assistants need clear guardrails and minimal intake logic.</li>
+          <li>Conversion-focused behavior beats “clever” conversation.</li>
+          <li>Durable skills prevent workflow drift.</li>
+          <li>Reliability thinking changes how prompts and systems are designed.</li>
+        </ul>
+
+        <h2>What This Enables Next</h2>
+        <p>
+          This phase strengthened systems design instincts, operational thinking, and runtime/state discipline.
+          More importantly, it produced a repeatable blueprint for future AI-assisted products and businesses.
+        </p>
+
+        <p>
+          v1.0 will be about reducing friction, improving observability, and increasing autonomy without sacrificing control.
         </p>
       </article>
     </main>
