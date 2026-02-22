@@ -1,0 +1,509 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Screenshot → FEN: Teaching a CNN to Read Chess Boards — Andre Batista</title>
+    <meta
+      name="description"
+      content="Building a screenshot-to-FEN pipeline from scratch: YOLO board detection, a from-scratch TensorFlow CNN piece classifier, and the messy reality of computer vision on chess screenshots."
+    />
+    <meta property="og:title" content="Screenshot → FEN: Teaching a CNN to Read Chess Boards" />
+    <meta property="og:description" content="Building a screenshot-to-FEN pipeline from scratch with YOLO + TensorFlow. Five failed attempts, synthetic data, constrained decoding, and what actually worked." />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://hdxsfbr.github.io/andre-batista-blog/posts/screenshot2fen.html" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Screenshot → FEN: Teaching a CNN to Read Chess Boards" />
+    <meta name="twitter:description" content="Five failed attempts, synthetic data, constrained decoding, and what actually worked." />
+    <link rel="stylesheet" href="../style.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
+    <script>hljs.highlightAll();</script>
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-LZ22RRXS8C"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-LZ22RRXS8C');
+    </script>
+    <style>
+      .attempt-table { width: 100%; border-collapse: collapse; margin: 1.2rem 0; font-size: 0.95rem; }
+      .attempt-table th, .attempt-table td { padding: 0.5rem 0.7rem; border-bottom: 1px solid var(--line); text-align: left; }
+      .attempt-table th { font-weight: 600; }
+      .pipeline-flow { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; margin: 1.2rem 0; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9rem; }
+      .pipeline-flow .step { background: #f5f5f5; padding: 0.4rem 0.8rem; border-radius: 6px; border: 1px solid var(--line); }
+      .pipeline-flow .arrow { color: var(--muted); font-weight: bold; }
+      .callout { background: #f9f9f9; border-left: 3px solid #333; padding: 0.8rem 1rem; margin: 1.2rem 0; border-radius: 0 6px 6px 0; }
+      .callout p { margin: 0; }
+      pre code { border-radius: 8px; font-size: 0.88rem; }
+    </style>
+  </head>
+  <body>
+    <main class="container post">
+      <nav><a href="../index.html">← Back to home</a></nav>
+      <article>
+        <h1>♟️ Screenshot → FEN: Teaching a CNN to Read Chess Boards</h1>
+        <p class="meta">Published: Feb 2026 · Authors: Andre Batista & Joe</p>
+
+        <p>
+          I wanted a simple thing: look at a chess.com screenshot and get the board position as a
+          <a href="https://en.wikipedia.org/wiki/Forsyth%E2%80%93Edwards_Notation" target="_blank" rel="noopener">FEN string</a>.
+          Voice command → screenshot → FEN → Stockfish analysis. A coaching loop for a ~1900 rapid player
+          who keeps blundering bishops.
+        </p>
+        <p>
+          What I got instead was a crash course in why computer vision is harder than it looks,
+          why heuristics break on the second image, and why the
+          <a href="https://www.deeplearning.ai/courses/deep-learning-specialization/" target="_blank" rel="noopener">deeplearning.ai CNN course</a>
+          is worth doing before you attempt something like this.
+        </p>
+        <p>
+          This post walks through the full journey — the five failed attempts at board detection,
+          the from-scratch piece classifier, synthetic data generation, constrained decoding,
+          and what we shipped. It's co-authored with Joe, my AI assistant running on
+          <a href="https://github.com/openclaw/openclaw" target="_blank" rel="noopener">OpenClaw</a>,
+          who pair-programmed the entire thing with me in a Jupyter notebook.
+        </p>
+
+        <h2>The Goal</h2>
+        <p>Given a random chess.com screenshot, return:</p>
+        <ul>
+          <li>The FEN for the largest visible board</li>
+          <li>Board orientation (white or black on bottom)</li>
+          <li>Confidence metrics per square</li>
+        </ul>
+
+        <div class="pipeline-flow">
+          <span class="step">Screenshot</span>
+          <span class="arrow">→</span>
+          <span class="step">YOLO detect</span>
+          <span class="arrow">→</span>
+          <span class="step">Crop board</span>
+          <span class="arrow">→</span>
+          <span class="step">8×8 split</span>
+          <span class="arrow">→</span>
+          <span class="step">CNN classify</span>
+          <span class="arrow">→</span>
+          <span class="step">Constrained decode</span>
+          <span class="arrow">→</span>
+          <span class="step">FEN</span>
+        </div>
+
+        <p>Sounds straightforward. It wasn't.</p>
+
+        <h2>Module 1: Finding the Board (Five Attempts)</h2>
+        <p>
+          The first problem is deceptively simple: given a full-screen screenshot with browser chrome,
+          sidebars, ads, and maybe a YouTube video, find the chess board.
+        </p>
+
+        <h3>Attempt 1: Pretrained YOLO</h3>
+        <p>
+          YOLOv8 out of the box. COCO doesn't include "chess board" as a class, but maybe it'd
+          detect it as a TV screen or monitor?
+        </p>
+        <p>
+          Nope. It found people, laptops, and a cell phone. No board. Fair enough — COCO has
+          80 classes and chess boards aren't one of them.
+        </p>
+
+        <h3>Attempt 2: Edge Detection + Contours</h3>
+        <p>
+          Classic CV approach: Canny edges → find contours → filter for squares.
+          Zero candidates. The board's internal grid lines confused the contour detector,
+          and the pieces sitting on squares broke any clean edge signal.
+        </p>
+
+        <h3>Attempt 3: Color Template Matching</h3>
+        <p>
+          Chess.com uses known color themes. If we know the exact light/dark square colors,
+          we can create a binary mask and find the largest matching region.
+        </p>
+
+<pre><code class="language-python">THEMES = {
+    'green':  {'light': (235,236,208), 'dark': (115,149, 82)},
+    'brown':  {'light': (240,217,181), 'dark': (181,136, 99)},
+    'blue':   {'light': (222,227,230), 'dark': (140,162,173)},
+    'purple': {'light': (230,213,236), 'dark': (150,111,168)},
+}
+</code></pre>
+
+        <p>
+          This found board-colored regions but couldn't reliably isolate the board
+          from the rest of the UI. Chess.com's sidebar uses similar greens.
+        </p>
+
+        <h3>Attempt 4: Sliding Window + Checkerboard Scoring</h3>
+        <p>
+          Combine color matching with structural validation. Slide a square window across the image
+          at multiple scales, score each position on how well it matches an 8×8 alternating grid:
+        </p>
+
+<pre><code class="language-python">def checkerboard_score(region):
+    """Score how well a region matches an 8x8 alternating grid."""
+    h, w = region.shape[:2]
+    sq_h, sq_w = h // 8, w // 8
+    light_vals, dark_vals = [], []
+
+    for r in range(8):
+        for c in range(8):
+            cell = region[r*sq_h:(r+1)*sq_h, c*sq_w:(c+1)*sq_w]
+            mean_val = cell.mean()
+            if (r + c) % 2 == 0:
+                light_vals.append(mean_val)
+            else:
+                dark_vals.append(mean_val)
+
+    contrast = abs(np.mean(light_vals) - np.mean(dark_vals))
+    uniformity = 1 / (1 + np.std(light_vals) + np.std(dark_vals))
+    return contrast * uniformity
+</code></pre>
+
+        <p>
+          This actually worked! On one image. It found the correct board with a slight offset —
+          about a quarter-square off. A refinement pass (nudging ±pixels to maximize score) got it
+          close enough.
+        </p>
+        <p>
+          Then I tried a second screenshot. It broke.
+        </p>
+
+        <div class="callout">
+          <p>
+            <strong>Lesson learned:</strong> Heuristics are great for exploration and documentation.
+            They teach you what features matter. But they're brittle across varied inputs.
+            After four attempts, the answer was obvious: train a model.
+          </p>
+        </div>
+
+        <h3>Attempt 5: Fine-Tune YOLOv8</h3>
+        <p>
+          I grabbed a labeled chess board dataset (498 training images, YOLO format) and fine-tuned
+          YOLOv8n for 50 epochs on our RTX 4090. Single class: <code>chessboard</code>.
+        </p>
+
+<pre><code class="language-python">from ultralytics import YOLO
+
+model = YOLO('yolov8n.pt')
+model.train(
+    data='fen-data/data.yaml',
+    epochs=50,
+    imgsz=640,
+    batch=16,
+    name='fen-yolo/chessboard_v1'
+)
+</code></pre>
+
+        <p>
+          Trained in minutes. Worked on every test image. Reliable bounding boxes with 90%+ confidence.
+        </p>
+        <p>
+          <strong>Four attempts of hand-crafted heuristics → one fine-tuning run that just works.</strong>
+          This is the lesson the CNN course drills into you, and it hits differently when you've
+          lived through the alternative.
+        </p>
+
+        <table class="attempt-table">
+          <thead>
+            <tr><th>Attempt</th><th>Approach</th><th>Result</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>1</td><td>Pretrained YOLO</td><td>Detected people, not boards ❌</td></tr>
+            <tr><td>2</td><td>Edge detection + contours</td><td>Zero candidates ❌</td></tr>
+            <tr><td>3</td><td>Color template matching</td><td>Found regions, couldn't isolate ❌</td></tr>
+            <tr><td>4</td><td>Sliding window + checkerboard</td><td>Worked on 1 image, broke on 2nd ⚠️</td></tr>
+            <tr><td>5</td><td>Fine-tuned YOLOv8</td><td>Reliable across all test images ✅</td></tr>
+          </tbody>
+        </table>
+
+        <h2>Module 2: Piece Classification (From Scratch)</h2>
+        <p>
+          With the board reliably cropped, the next step: split it into 64 squares and classify
+          each one. 13 classes: <code>empty, wp, wn, wb, wr, wq, wk, bp, bn, bb, br, bq, bk</code>.
+        </p>
+        <p>
+          This is where the
+          <a href="https://www.deeplearning.ai/courses/deep-learning-specialization/" target="_blank" rel="noopener">deeplearning.ai Deep Learning Specialization</a>
+          (specifically Course 4: Convolutional Neural Networks) paid off directly.
+          The course walks you through building CNN architectures from first principles —
+          conv layers, pooling, batch norm, data augmentation — and that's exactly what
+          this classifier needed.
+        </p>
+
+        <h3>The Architecture</h3>
+        <p>
+          Nothing fancy. A straightforward CNN stack built with TensorFlow/Keras,
+          following patterns from the course:
+        </p>
+
+<pre><code class="language-python">model = keras.Sequential([
+    layers.Rescaling(1./255, input_shape=(*IMG_SIZE, 3)),
+
+    # Data augmentation (during training only)
+    layers.RandomFlip("horizontal"),
+    layers.RandomRotation(0.02),
+    layers.RandomZoom(0.05),
+
+    # Conv blocks with increasing filters
+    layers.Conv2D(32, 3, padding='same', activation='relu'),
+    layers.BatchNormalization(),
+    layers.MaxPooling2D(),
+
+    layers.Conv2D(64, 3, padding='same', activation='relu'),
+    layers.BatchNormalization(),
+    layers.MaxPooling2D(),
+
+    layers.Conv2D(128, 3, padding='same', activation='relu'),
+    layers.BatchNormalization(),
+    layers.MaxPooling2D(),
+
+    # Dense head
+    layers.Flatten(),
+    layers.Dense(256, activation='relu'),
+    layers.Dropout(0.4),
+    layers.Dense(13, activation='softmax'),
+])
+</code></pre>
+
+        <p>
+          96×96 input images. Three conv blocks (32→64→128 filters), batch normalization after each,
+          max pooling to downsample. Flatten → Dense → Dropout → 13-class softmax.
+          Adam optimizer, sparse categorical crossentropy.
+        </p>
+        <p>
+          If you've done Course 4, this should look familiar. It's the standard architecture
+          the course builds up to, minus the residual connections (which weren't needed for 13 classes
+          on 96×96 crops).
+        </p>
+
+        <h3>The Data Problem</h3>
+        <p>
+          I started with manually labeled square crops from a few chess.com screenshots.
+          Maybe 200 images total. Training worked — 95%+ validation accuracy.
+        </p>
+        <p>
+          Then I ran end-to-end on a new screenshot and it fell apart. Bishops got classified
+          as pawns. Some empty squares got classified as pieces. The model had memorized the
+          training screenshots' specific piece styles and colors.
+        </p>
+
+        <div class="callout">
+          <p>
+            <strong>The CNN course warns you about this:</strong> small datasets + high-capacity models
+            = overfitting. The fix isn't more layers — it's more data.
+          </p>
+        </div>
+
+        <h3>Synthetic Data to the Rescue</h3>
+        <p>
+          I wrote a generator using <code>python-chess</code> that creates random legal board
+          positions, renders them as images with chess.com-style piece sprites, and auto-labels
+          all 64 squares:
+        </p>
+
+<pre><code class="language-python">import chess
+import chess.svg
+from pathlib import Path
+import random
+
+def generate_synthetic_boards(num_boards, out_dir):
+    """Generate random legal positions, render, split into labeled squares."""
+    for i in range(num_boards):
+        board = chess.Board()
+        # Play random moves to get a realistic mid-game position
+        for _ in range(random.randint(5, 40)):
+            moves = list(board.legal_moves)
+            if not moves:
+                break
+            board.push(random.choice(moves))
+
+        # Render board and split into 64 squares
+        img = render_board(board)  # custom renderer using piece sprites
+        for rank in range(8):
+            for file in range(8):
+                square = chess.square(file, 7 - rank)
+                piece = board.piece_at(square)
+                label = piece_to_label(piece)  # e.g., 'wp', 'bk', 'empty'
+                crop = extract_square(img, rank, file)
+                save_path = Path(out_dir) / label / f'synth_{i}_r{rank}c{file}.png'
+                save_path.parent.mkdir(parents=True, exist_ok=True)
+                cv2.imwrite(str(save_path), crop)
+</code></pre>
+
+        <p>
+          I generated 2,000 synthetic boards (128,000 square crops), merged them with the real data,
+          and retrained. The merged model generalized much better — bishops were no longer pawns.
+        </p>
+
+        <h2>Module 3: From Predictions to Valid FEN</h2>
+        <p>
+          Even with good per-square accuracy, the raw predictions often produced invalid boards.
+          Chess has rules: one king per side, max 8 pawns, max 2 bishops (before promotions), etc.
+          A board with 3 white kings and 10 black pawns is nonsense.
+        </p>
+
+        <h3>Constrained Decoding</h3>
+        <p>
+          Instead of blindly taking the argmax prediction for each square, I used the
+          <strong>top-k probabilities</strong> and applied chess-legal constraints:
+        </p>
+
+<pre><code class="language-python">MAX_COUNTS = {
+    'bk': 1, 'wk': 1,
+    'bp': 8, 'wp': 8,
+    'bb': 2, 'wb': 2,
+    'bn': 2, 'wn': 2,
+    'br': 2, 'wr': 2,
+    'bq': 1, 'wq': 1,
+}
+
+def decode_with_constraints(topk_grid):
+    """Build a valid board from top-k predictions per square."""
+    pred = [[topk_grid[r][c][0][0] for c in range(8)] for r in range(8)]
+
+    for piece, max_count in MAX_COUNTS.items():
+        while count(pred, piece) > max_count:
+            # Find the square where this piece has the lowest confidence
+            worst = find_lowest_confidence_square(pred, topk_grid, piece)
+            # Replace with next-best prediction that doesn't violate constraints
+            pred[worst.r][worst.c] = next_valid_alternative(topk_grid, worst, pred)
+
+    return board_to_fen(pred)
+</code></pre>
+
+        <p>
+          The constrained decoder acts as a safety net. When the CNN says "3 white kings,"
+          the decoder keeps the most confident one and downgrades the others to their
+          second-choice prediction. It's a simple greedy repair, not beam search —
+          but it catches most invalid boards.
+        </p>
+
+        <h2>Orientation Detection</h2>
+        <p>
+          Chess.com renders rank numbers (1–8) and file letters (a–h) in the corners of edge squares.
+          If '1' is at the bottom, white's on the bottom. If '8' is at the bottom, black is.
+        </p>
+        <p>
+          I used Tesseract OCR on the corner squares. It was flaky — the labels are tiny,
+          anti-aliased, and partially covered by pieces. Multiple rounds of preprocessing
+          (thresholding, cropping to the exact corner pixel region, upscaling) got it
+          working reliably enough.
+        </p>
+
+        <h2>The API</h2>
+        <p>
+          The whole pipeline is wrapped in a FastAPI service:
+        </p>
+
+<pre><code class="language-python">@app.post("/fen")
+async def extract_fen(file: UploadFile):
+    img = load_image(file)
+    board_crop = yolo_detect_largest_board(img)
+    orientation = detect_orientation(board_crop)
+    squares = split_8x8(board_crop)
+    predictions = classify_squares(squares)
+    fen = constrained_decode(predictions)
+
+    return {
+        "fen": fen,
+        "orientation": orientation,
+        "confidence_summary": compute_confidence(predictions),
+        "warnings": collect_warnings(predictions)
+    }
+</code></pre>
+
+        <p>
+          Dockerized, runs on our RTX 4090 at home.
+          The end-to-end dream: say "analyze this position" →
+          <a href="https://github.com/openclaw/openclaw" target="_blank" rel="noopener">OpenClaw</a>
+          takes a screenshot → hits the API → feeds the FEN to Stockfish → tells me
+          what I should've played instead of hanging my bishop.
+        </p>
+
+        <h2>What We Learned</h2>
+
+        <h3>1. Heuristics teach, models ship</h3>
+        <p>
+          The four failed heuristic attempts weren't wasted. They taught me what features matter
+          (checkerboard contrast, color clustering, grid alignment) and made the YOLO labels
+          and CNN architecture choices informed rather than random. But heuristics don't generalize.
+          The moment you test on a second image, they break.
+        </p>
+
+        <h3>2. The CNN course content is directly applicable</h3>
+        <p>
+          The deeplearning.ai CNN course (Course 4 of the Deep Learning Specialization) covers
+          conv layers → pooling → batch norm → data augmentation → transfer learning.
+          Every single one of those showed up in this project. If you're a student working
+          through the course and wondering "when will I use this?" — this is when.
+          Build something real alongside the coursework.
+        </p>
+
+        <h3>3. Synthetic data is a superpower</h3>
+        <p>
+          When your model overfits on 200 real images, generating 128,000 synthetic squares
+          from <code>python-chess</code> is a game-changer. The key insight: you don't need
+          photorealistic renders. You need variety in piece positions and board states.
+          The model learns piece shapes, not pixel-perfect rendering.
+        </p>
+
+        <h3>4. Post-processing matters as much as the model</h3>
+        <p>
+          A 97% per-square accuracy still means ~2 wrong squares per board. That's enough to
+          produce an illegal position. Constrained decoding — using domain knowledge (chess rules)
+          to repair predictions — turned "mostly right" into "usably correct."
+        </p>
+
+        <h3>5. Keep the failure log</h3>
+        <p>
+          The notebook is intentionally a full engineering log, including every failed attempt.
+          When you're debugging at 1am and the sliding window scorer is returning garbage,
+          you want to see exactly why you abandoned that approach three days ago.
+          Future-you will thank present-you.
+        </p>
+
+        <h2>Human + AI Pair Programming</h2>
+        <p>
+          This project was built entirely through pair programming between me (Andre) and Joe,
+          an AI assistant running on <a href="https://github.com/openclaw/openclaw" target="_blank" rel="noopener">OpenClaw</a>.
+          The workflow: I'd describe what I wanted, Joe would write the code, I'd run it in
+          the Jupyter notebook, we'd look at the results together, and iterate.
+        </p>
+        <p>
+          What worked well about this:
+        </p>
+        <ul>
+          <li><strong>Rapid prototyping</strong> — each heuristic attempt was coded and tested in minutes</li>
+          <li><strong>No context loss</strong> — the notebook captured every decision and its rationale</li>
+          <li><strong>Complementary strengths</strong> — I knew what chess boards look like; Joe knew OpenCV APIs and TensorFlow patterns</li>
+          <li><strong>Honest feedback</strong> — when an approach was clearly failing, neither of us was emotionally attached to it</li>
+        </ul>
+        <p>
+          The full notebook (with all the failed attempts preserved) is
+          <a href="https://github.com/hdxsfbr/screenshot2fen" target="_blank" rel="noopener">open source on GitHub</a>.
+        </p>
+
+        <h2>What's Next</h2>
+        <ul>
+          <li><strong>Domain-specific training data</strong> — ingest more chess.com piece styles to reduce bishop/pawn confusion on unseen themes</li>
+          <li><strong>Transfer learning</strong> — try MobileNet or EfficientNet as the backbone instead of from-scratch (Course 4, Week 2 material)</li>
+          <li><strong>Voice integration</strong> — the original dream: "Hey Joe, analyze this position" → screenshot → FEN → Stockfish eval → spoken analysis</li>
+          <li><strong>Mobile</strong> — run the pipeline on a phone screenshot from the chess.com app</li>
+        </ul>
+
+        <hr style="margin: 2rem 0;" />
+        <p>
+          If you're taking the deeplearning.ai CNN course and want a project to apply what you're learning,
+          chess piece classification is a great one. It's visual, the classes are well-defined,
+          you can generate unlimited training data, and the domain constraints give you a natural
+          post-processing layer to implement. Plus you end up with something you can actually use.
+        </p>
+        <p>
+          Code: <a href="https://github.com/hdxsfbr/screenshot2fen" target="_blank" rel="noopener">github.com/hdxsfbr/screenshot2fen</a>
+        </p>
+      </article>
+    </main>
+  </body>
+</html>
