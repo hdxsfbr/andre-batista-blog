@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Reverse-Engineering a SupeRun Walking Pad — Andre Batista</title>
+    <meta
+      name="description"
+      content="How we turned a random SupeRun walking pad into a controllable BLE device: APK reversing, packet archaeology, Python tooling, an Android MVP, and a public repo."
+    />
+    <meta property="og:title" content="Reverse-Engineering a SupeRun Walking Pad" />
+    <meta property="og:description" content="APK reversing, BLE packet archaeology, Python control scripts, and an Android MVP for a SupeRun/PitPat walking pad." />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://hdxsfbr.github.io/andre-batista-blog/posts/walkingpad.html" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Reverse-Engineering a SupeRun Walking Pad" />
+    <meta name="twitter:description" content="Turning a black-box treadmill into something we can script, inspect, and control." />
+    <link rel="stylesheet" href="../style.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
+    <script>hljs.highlightAll();</script>
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-LZ22RRXS8C"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-LZ22RRXS8C');
+    </script>
+    <style>
+      .callout { background: #f9f9f9; border-left: 3px solid #333; padding: 0.8rem 1rem; margin: 1.2rem 0; border-radius: 0 6px 6px 0; }
+      .callout p { margin: 0; }
+      .pipeline-flow { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; margin: 1.2rem 0; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9rem; }
+      .pipeline-flow .step { background: #f5f5f5; padding: 0.4rem 0.8rem; border-radius: 6px; border: 1px solid var(--line); }
+      .pipeline-flow .arrow { color: var(--muted); font-weight: bold; }
+      pre code { border-radius: 8px; font-size: 0.88rem; }
+      .mini-table { width: 100%; border-collapse: collapse; margin: 1.2rem 0; font-size: 0.95rem; }
+      .mini-table th, .mini-table td { padding: 0.5rem 0.7rem; border-bottom: 1px solid var(--line); text-align: left; }
+      .mini-table th { font-weight: 600; }
+    </style>
+  </head>
+  <body>
+    <main class="container post">
+      <nav><a href="../index.html">← Back to home</a></nav>
+      <article>
+        <h1>🏃 Reverse-Engineering a SupeRun Walking Pad</h1>
+        <p class="meta">Published: Mar 2026 · Authors: Andre Batista &amp; Joe</p>
+
+        <p>
+          Sometimes the most satisfying software projects start with a very dumb emotion:
+          <em>I own this thing, why the hell can't I control it properly?</em>
+        </p>
+        <p>
+          That was the vibe with my SupeRun walking pad. It worked, technically. But it lived behind a vendor app,
+          an opaque BLE protocol, and the usual pile of consumer-IoT mystery meat. So Joe and I did what any reasonable
+          pair of nerds would do: we started peeling it apart.
+        </p>
+        <p>
+          The end result was better than expected: a Python controller, an Android MVP app, protocol notes, and a public repo for the clean parts of the work. Not bad for what started as treadmill spite.
+        </p>
+
+        <h2>The Goal</h2>
+        <p>We wanted direct control over the walking pad without depending on the original app.</p>
+        <ul>
+          <li>Connect over BLE</li>
+          <li>Start, pause, stop, and set speed</li>
+          <li>Understand the packet format instead of blindly replaying bytes</li>
+          <li>Figure out whether startup sounds / voice prompts could be disabled</li>
+          <li>Package the clean, reusable parts into a public repo</li>
+        </ul>
+
+        <div class="pipeline-flow">
+          <span class="step">APK reverse</span>
+          <span class="arrow">→</span>
+          <span class="step">BLE capture</span>
+          <span class="arrow">→</span>
+          <span class="step">Packet decode</span>
+          <span class="arrow">→</span>
+          <span class="step">Python controller</span>
+          <span class="arrow">→</span>
+          <span class="step">Android MVP</span>
+          <span class="arrow">→</span>
+          <span class="step">Public repo</span>
+        </div>
+
+        <h2>Step 1: Treat the App as Evidence</h2>
+        <p>
+          We started by decompiling the Android app package and looking for anything related to Bluetooth, sound settings,
+          control packets, and treadmill state.
+        </p>
+        <p>
+          That immediately paid off. Instead of fishing blind, we found explicit code paths for things like:
+        </p>
+        <ul>
+          <li><code>controlBuzzerSwitch</code></li>
+          <li><code>controlSpeaker</code></li>
+          <li><code>getSpeakerStatus</code></li>
+        </ul>
+        <p>
+          That's the good kind of reverse engineering: not cinematic hacker nonsense, just carefully reading somebody else's Java/Kotlin and noticing they already told you where the bodies are buried.
+        </p>
+
+        <h2>Step 2: Find the BLE Shape of the Device</h2>
+        <p>
+          Once we had clues from the app, we matched them against BLE traffic and device behavior.
+          The useful part of the protocol sat behind a simple custom service/characteristic layout:
+        </p>
+
+<pre><code>Service: 0000ffff-0000-1000-8000-00805f9b34fb
+Write:   0000ff01-0000-1000-8000-00805f9b34fb
+Notify:  0000ff02-0000-1000-8000-00805f9b34fb
+</code></pre>
+
+        <p>
+          We recovered a keepalive packet, control packet family, and enough status structure to start building real tools instead of throwing random hex at the treadmill and hoping it didn't launch me into a wall.
+        </p>
+
+        <div class="callout">
+          <p><strong>Lesson:</strong> consumer BLE devices often aren't cryptographically fancy. They're just undocumented. Once you find the packet family and timing model, the whole thing stops looking magical.</p>
+        </div>
+
+        <h2>Step 3: Build the Python Controller First</h2>
+        <p>
+          Python was the fastest way to iterate, so we built a small controller around <code>bleak</code>.
+          It handles scan/connect, notifications, keepalive packets, and the obvious treadmill commands.
+        </p>
+
+<pre><code class="language-python">def make_keepalive(seq: int) -> bytes:
+    return bytes([0x4D, 0x00, seq & 0xFF, 0x05, 0x6A, 0x05, 0xFD, 0xF8, 0x43])
+
+
+def mph_to_raw(speed_mph: float) -> int:
+    return max(0, min(int(round(speed_mph * 1600.0)), 0xFFFF))
+</code></pre>
+
+        <p>
+          The interesting detail here is that speed appeared to use a raw scale of <code>mph * 1600</code>.
+          That's one of those protocol facts that looks arbitrary until you test it a few times and realize,
+          no, this weird little number is actually the map.
+        </p>
+        <p>
+          Once the Python side was stable enough, we had commands for start, set speed, pause, and stop.
+          More importantly, we had a place to encode what we believed the protocol meant.
+        </p>
+
+        <h2>Step 4: Chase the Beep</h2>
+        <p>
+          Naturally, we also wanted to see whether the walking pad's startup sound and voice prompts could be disabled.
+          The vendor app strongly suggested yes.
+        </p>
+        <p>
+          From the reversed app logic, we recovered packet forms like these:
+        </p>
+
+<pre><code>Query speaker status: 6B 05 9F 9A 43
+Set speaker config:   6B 07 9E &lt;powerOn&gt; &lt;voicePrompts&gt; &lt;xor&gt; 43
+</code></pre>
+
+        <p>
+          That's where the project shifted from "we can definitely drive the treadmill" to
+          "we probably can control the audio settings too, but let's not pretend we've fully nailed that path yet."
+          Some of the reverse engineering was clean. Some of it was still experimental.
+        </p>
+        <p>
+          And that's fine. A good engineering write-up should separate <em>confirmed behavior</em> from <em>strongly supported hypotheses</em>.
+          Bullshitting your future self is a great way to waste a weekend.
+        </p>
+
+        <h2>Step 5: Build the Android MVP</h2>
+        <p>
+          After the Python controller proved the basics, we built a minimal Android app that talks directly to the walking pad over BLE.
+          No pretty UX. No account system. No cloud nonsense. Just:
+        </p>
+        <ul>
+          <li>connect / disconnect</li>
+          <li>start</li>
+          <li>set speed</li>
+          <li>pause</li>
+          <li>stop</li>
+          <li>status text from incoming notifications</li>
+        </ul>
+        <p>
+          It reuses the same packet model as the Python controller, which is the main point. One clean protocol understanding, two clients.
+        </p>
+
+        <h2>Step 6: Publish the Clean Version</h2>
+        <p>
+          The raw project folder had a lot of garbage in it: APKs, bugreports, BLE snoop logs, local SDK config,
+          decompiler output, build junk, and a real device MAC address that had no business being shoved into a public repo.
+        </p>
+        <p>
+          So we cleaned it properly before publishing:
+        </p>
+
+        <table class="mini-table">
+          <thead>
+            <tr><th>Kept</th><th>Excluded</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Python controller</td><td>Vendor APK</td></tr>
+            <tr><td>Android MVP source</td><td>Bugreports / BLE snoop logs</td></tr>
+            <tr><td>Protocol notes</td><td>Decompiled proprietary sources</td></tr>
+            <tr><td>Gradle wrapper / project files</td><td>Local SDK config / build artifacts</td></tr>
+          </tbody>
+        </table>
+
+        <p>
+          We also scrubbed the real hardcoded BLE MAC from the public code and replaced it with placeholders.
+          Public repo means public repo, not accidental dox-yourself-as-a-service.
+        </p>
+        <p>
+          The result lives here:
+          <a href="https://github.com/hdxsfbr/walkingpad" target="_blank" rel="noopener">github.com/hdxsfbr/walkingpad</a>
+        </p>
+
+        <h2>What I Like About This Project</h2>
+        <p>
+          This wasn't just "make a treadmill go brrr." It was a nice little stack of practical engineering skills:
+        </p>
+        <ul>
+          <li>reverse engineering for interoperability</li>
+          <li>BLE protocol inference</li>
+          <li>quick Python tooling for fast iteration</li>
+          <li>an Android control surface once the protocol was understood</li>
+          <li>good repo hygiene before publishing</li>
+        </ul>
+        <p>
+          That's my favorite kind of project: the thing itself is kind of funny, but the engineering muscles are real.
+        </p>
+
+        <h2>What’s Next</h2>
+        <ul>
+          <li>replace hardcoded device targeting in the Android app with scan/select UX</li>
+          <li>keep refining speaker / buzzer control behavior</li>
+          <li>validate behavior across more PitPat / SupeRun variants</li>
+          <li>make the Android app less MVP-looking and more "normal human can use this"</li>
+        </ul>
+
+        <p>
+          Anyway, that's how a walking pad turned into a reverse-engineering project.
+          Not because it needed to. Because it annoyed me.
+          Which, honestly, is often how the good ones start.
+        </p>
+      </article>
+    </main>
+  </body>
+</html>
